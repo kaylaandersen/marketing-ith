@@ -1,3 +1,4 @@
+import cPickle as pickle
 from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
 from sklearn.cross_validation import train_test_split
 from sklearn import grid_search, metrics
@@ -80,7 +81,25 @@ x = model_df.values
 # make a 70/30 train test split
 x_train,x_test,y_train,y_test = train_test_split(x,y,train_size=.70)
 
-# Test randome forest classifier
-rf = Model(RandomForestClassifier)
-rf.run_grid_search(grid_search_params['RandomForestClassifier'], x_train, y_train)
-y_pred = rf.predict_model(x_test)
+# # Test random forest classifier
+# rf = Model(RandomForestClassifier)
+# rf.run_grid_search(grid_search_params['RandomForestClassifier'], x_train, y_train)
+# y_pred = rf.predict_model(x_test)
+# # random forest results
+# rf_accuracy = rf.score(y_test, metrics.accuracy_score)
+# rf_recall = rf.score(y_test, metrics.recall_score)
+# rf_precision = rf.score(y_test, metrics.precision_score)
+# # dump the model to a pickle so we don't have to retrain it.
+# rf.dump_model(r'../models/rf.p')
+
+
+# Test gradient boosting
+gb = Model(GradientBoostingClassifier)
+gb.run_grid_search(grid_search_params['GradientBoostingClassifier'], x_train, y_train)
+y_pred_gb = gb.predict_model(x_test)
+# random forest results
+gb_accuracy = gb.score(y_test, metrics.accuracy_score)
+gb_recall = gb.score(y_test, metrics.recall_score)
+gb_precision = gb.score(y_test, metrics.precision_score)
+# dump the model to a pickle so we don't have to retrain it.
+gb.dump_model(r'../models/gb.p')
