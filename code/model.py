@@ -1,10 +1,6 @@
+import numpy as np
 import pandas as pd
-
-# input - move to command line eventually
-data_source = r'../data/Ibotta_Marketing_Sr_Analyst_Dataset.csv'
-
-# read data
-df = pd.read_csv(data_source, index_col='customer_id')
+import sys
 
 def clean_info(df):
     df = df.copy()
@@ -50,29 +46,65 @@ def dow(df):
     stack_frame = stack.to_frame(name='dow')
     return stack_frame
 
-# split out the time and funding data from the activity into new columns
-clean_df = clean_info(df)
+def main():
 
-# create a dataframe with the activity type by customer and day
-act_cols = [c for c in clean_df.columns if 'day' in c and '_' not in c]
-act_df = stack_days(clean_df, act_cols, 'activity')
+    data_csv = sys.argv[1]
+    # read data
+    df = pd.read_csv(data_csv, index_col='customer_id')
 
-# create a dataframe with time spent in app by customer and day
-ts_cols = [c for c in clean_df.columns if '_ts' in c]
-ts_df = stack_days(clean_df, ts_cols, 'time_spent')
+    # split out the time and funding data from the activity into new columns
+    clean_df = clean_info(df)
 
-# create a dataframe with the funding type by customer and day
-fund_cols = [c for c in clean_df.columns if '_fund' in c]
-fund_df = stack_days(clean_df, fund_cols, 'funded')
+    # create a dataframe with the activity type by customer and day
+    act_cols = [c for c in clean_df.columns if 'day' in c and '_' not in c]
+    act_df = stack_days(clean_df, act_cols, 'activity')
 
-dow_df = dow(clean_df)
+    # create a dataframe with time spent in app by customer and day
+    ts_cols = [c for c in clean_df.columns if '_ts' in c]
+    ts_df = stack_days(clean_df, ts_cols, 'time_spent')
 
-join_df = act_df.join(ts_df, how='inner').join(fund_df, how='inner')
-join_df_dow = join_df.join(dow_df, how='inner')
-join_df_dow.set_index('dow', append=True, inplace=True)
+    # create a dataframe with the funding type by customer and day
+    fund_cols = [c for c in clean_df.columns if '_fund' in c]
+    fund_df = stack_days(clean_df, fund_cols, 'funded')
 
-# feature engineering!
+    # feature engineering!
+    # adds a label for each activity type and the number of days of each
+    sum_act = act_df['activity'].groupby(level=0).value_counts().unstack().fillna(0)
+    # column for total time spent in app (in seconds)
+    sum_ts = ts_df['time_spent'].astype(float).groupby(level=0).sum().fillna(0)
+    # sum of count by each funding type-- this might need work as a feature
+    sum_fund = fund_df['funded'].groupby(level=0).value_counts().unstack()
 
-sum_act = join_df['activity'].groupby(level=0).value_counts().unstack().fillna(0)
-sum_day = join_df['activity'].groupby(level=1).value_counts().unstack().fillna(0)
-sum_dow = join_df_dow['activity'].groupby(level=2).value_counts().unstack().fillna(0)
+    # get days until app first opened- any activity
+    days = act_df.reset_index(level=1)
+    act_days_series = days.query("activity != 'gap'")['day'].groupby(level=0).apply(
+                                                              lambda x: np.array(x))
+    # Use the days the user was active to add first activity day and longest streak
+    act_days_df = act_days_series.to_frame('days_active')
+    act_days_df['first_activity'] = act_days_df['days_active'].apply(lambda x: x[0])
+    act_days_df['streak_activity'] = act_days_df['days_active'].apply(lambda x:
+                 max([len(i) for i in np.split(x, np.where(np.diff(x) != 1)[0]+1)]))
+    # fill in na's-- these will be ones where they were gaps all 14 days
+    act_first = clean_df.loc[:, []].join(act_days_df).fillna({'first_activity': 15,
+                                                              'streak_activity': 0},
+                                                              axis=0)
+    act_first.drop('days_active', axis=1, inplace=True)
+
+    # Join final
+    final_df = clean_df[['start_dow']].join(sum_act).join(sum_ts).join(sum_fund).join(act_first).join(clean_df[['future_redemptions']])
+    # filling in the nas with 0 for now- I would prob do something better though***s
+    final_df.fillna({'funded': 0, 'selffunded': 0}, inplace=True)
+    return final_df
+
+    # # might do somthing with the days later
+    # add dow for each day
+    #dow_df = dow(clean_df)
+    # sum_day = join_df['activity'].groupby(level=1).value_counts().unstack().fillna(0)
+    # sum_dow = join_df_dow['activity'].groupby(level=2).value_counts().unstack().fillna(0)
+
+if __name__ == '__main__':
+
+    # input - move to command line eventually
+    #data_csv = r'../data/Ibotta_Marketing_Sr_Analyst_Dataset.csv'
+
+    model_df = main()
