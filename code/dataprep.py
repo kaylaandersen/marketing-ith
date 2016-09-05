@@ -46,9 +46,8 @@ def dow(df):
     stack_frame = stack.to_frame(name='dow')
     return stack_frame
 
-def main():
+def main(data_csv):
 
-    data_csv = sys.argv[1]
     # read data
     df = pd.read_csv(data_csv, index_col='customer_id')
 
@@ -107,4 +106,4 @@ if __name__ == '__main__':
     # input - move to command line eventually
     #data_csv = r'../data/Ibotta_Marketing_Sr_Analyst_Dataset.csv'
 
-    model_df = main()
+    model_df = main(sys.argv[1])
